@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meeting Cost Counter</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      background: #f7f7f7;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .container {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 8px;
+      max-width: 600px;
+      margin: auto;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+
+    th, td {
+      padding: 0.5rem;
+      text-align: left;
+      border: 1px solid #ddd;
+    }
+
+    th {
+      background: #f0f0f0;
+    }
+
+    .checkbox-container {
+      margin-bottom: 1rem;
+      text-align: left;
+    }
+
+    button {
+      margin-right: 0.5rem;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background: #007bff;
+      color: #fff;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    .stopwatch-display {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #555;
+      margin-top: 1rem;
+    }
+
+    .total-cost {
+      font-size: 1.5rem;
+      font-weight: bold;
+      text-align: center;
+      color: #ff5722;
+      margin-top: 2rem;
+    }
+
+    .threshold-message {
+      font-size: 1.2rem;
+      font-weight: bold;
+      text-align: center;
+      color: #4caf50;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Meeting Cost Counter</h1>
+
+  <div class="checkbox-container">
+    <input type="checkbox" id="hourly-mode-checkbox" />
+    <label for="hourly-mode-checkbox">Use working hours (hourly counter)</label>
+  </div>
+
+  <div id="weekly-hours-container" style="display: none;">
+    <label for="weekly-hours">Weekly Hours Worked:</label>
+    <input type="number" id="weekly-hours" placeholder="e.g., 40" min="1" value="40" />
+  </div>
+
+  <button id="add-salary">Add Salary</button>
+  <button id="start-button">Start</button>
+  <button id="stop-button">Stop</button>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Salary (€)</th>
+        <th>Live Counter (€)</th>
+      </tr>
+    </thead>
+    <tbody id="salary-table-body"></tbody>
+  </table>
+
+  <div class="stopwatch-display">
+    Time elapsed: <span id="stopwatch">00:00:00</span>
+  </div>
+
+  <div class="total-cost">
+    Total Meeting Cost: €<span id="total-cost">0.0000</span>
+  </div>
+
+  <div class="threshold-message" id="threshold-message"></div>
+</div>
+
+<script>
+  let salaries = [];
+  let intervalId = null;
+  let startTime = null;
+
+  const hourlyCheckbox = document.getElementById('hourly-mode-checkbox');
+  const weeklyHoursContainer = document.getElementById('weekly-hours-container');
+  const weeklyHoursInput = document.getElementById('weekly-hours');
+  const salaryTableBody = document.getElementById('salary-table-body');
+  const stopwatchDisplay = document.getElementById('stopwatch');
+  const totalCostDisplay = document.getElementById('total-cost');
+  const thresholdMessage = document.getElementById('threshold-message');
+
+  const messages = [
+    { threshold: 2, message: "You can buy a Coke with the cost of this meeting!" },
+    { threshold: 5, message: "You can buy a packet of cigarettes with the cost of this meeting!" },
+    { threshold: 10, message: "You can go to McDonald's with the cost of this meeting!" },
+    { threshold: 20, message: "You can buy a good book  with the cost of this meeting!" },
+    { threshold: 50, message: "You can fill your car's gas tank  with the cost of this meeting!" },
+    { threshold: 100, message: "You can take a decent dinner for two  with the cost of this meeting!" },
+    { threshold: 200, message: "You can spend a weekend in a nice hotel  with the cost of this meeting!" },
+    { threshold: 500, message: "You can buy a low-end laptop  with the cost of this meeting!" },
+    { threshold: 1000, message: "You can buy a mac  with the cost of this meeting!" },
+  ];
+
+  let currentMessageIndex = 0;
+
+  // Toggle weekly hours input visibility based on hourly mode
+  hourlyCheckbox.addEventListener('change', () => {
+    weeklyHoursContainer.style.display = hourlyCheckbox.checked ? 'block' : 'none';
+  });
+
+  // Add a new salary row to the table
+  function addSalary() {
+    const id = salaries.length;
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>
+        <input type="number" id="salary-${id}" placeholder="Enter yearly salary" min="0" value="50000" />
+      </td>
+      <td>
+        €<span id="counter-${id}">0.0000</span>
+      </td>
+    `;
+    salaryTableBody.appendChild(row);
+
+    // Add salary to the list
+    salaries.push({
+      id,
+      yearlySalary: 50000,
+      perSecond: 0,
+      earnedSoFar: 0,
+    });
+  }
+
+  // Format elapsed time as HH:MM:SS
+  function formatElapsedTime(elapsedMs) {
+    const totalSeconds = Math.floor(elapsedMs / 1000);
+    const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+    const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
+  }
+
+  // Update the threshold message
+  function updateThresholdMessage(totalCost) {
+    if (
+      currentMessageIndex < messages.length &&
+      totalCost >= messages[currentMessageIndex].threshold
+    ) {
+      thresholdMessage.textContent = messages[currentMessageIndex].message;
+      currentMessageIndex++;
+    }
+  }
+
+  // Start the live counter
+  function startCounter() {
+    if (intervalId !== null) return; // Prevent multiple intervals
+
+    const weeklyHours = parseFloat(weeklyHoursInput.value) || 40;
+
+    salaries.forEach((salary) => {
+      const salaryInput = document.getElementById(`salary-${salary.id}`);
+      salary.yearlySalary = parseFloat(salaryInput.value) || 0;
+
+      if (hourlyCheckbox.checked) {
+        // Hourly mode: calculate per second based on weekly hours
+        const secondsWorkedPerYear = weeklyHours * 52 * 3600;
+        salary.perSecond = salary.yearlySalary / secondsWorkedPerYear;
+      } else {
+        // Default mode
+        salary.perSecond = salary.yearlySalary / (365 * 24 * 60 * 60);
+      }
+      salary.earnedSoFar = 0; // Reset earned amount
+    });
+
+    startTime = Date.now();
+
+    intervalId = setInterval(() => {
+      const elapsedMs = Date.now() - startTime;
+      stopwatchDisplay.textContent = formatElapsedTime(elapsedMs);
+
+      let totalCost = 0;
+
+      salaries.forEach((salary) => {
+        const elapsedSeconds = elapsedMs / 1000;
+        salary.earnedSoFar = elapsedSeconds * salary.perSecond;
+
+        const counter = document.getElementById(`counter-${salary.id}`);
+        counter.textContent = salary.earnedSoFar.toFixed(4);
+
+        totalCost += salary.earnedSoFar;
+      });
+
+      totalCostDisplay.textContent = totalCost.toFixed(4);
+      updateThresholdMessage(totalCost);
+    }, 50);
+  }
+
+  // Stop the live counter
+  function stopCounter() {
+    if (intervalId !== null) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+  }
+
+  document.getElementById('add-salary').addEventListener('click', addSalary);
+  document.getElementById('start-button').addEventListener('click', startCounter);
+  document.getElementById('stop-button').addEventListener('click', stopCounter);
+
+  // Add an initial salary row by default
+  addSalary();
+</script>
+
+</body>
+</html>

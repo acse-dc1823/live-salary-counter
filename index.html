@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Meeting Cost Counter</title>
+  <title>Live Salary Counter</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -89,7 +89,15 @@
 <body>
 
 <div class="container">
-  <h1>Meeting Cost Counter</h1>
+  <h1>Live Salary Counter</h1>
+  <p>
+    This tool calculates the live salary being paid to participants, and can be used to
+    calculate the cost of a meeting. 
+    You can add participants, input their annual salaries, and optionally enable "hourly mode" for more accurate calculations. 
+    In hourly mode, the tool assumes participants work a standard number of hours per week (default: 40) and adjusts the cost calculation accordingly. 
+    Watch the live counter update in real time and see how much your meeting costs as time goes by!
+  
+  </p>
 
   <div class="checkbox-container">
     <input type="checkbox" id="hourly-mode-checkbox" />
@@ -104,6 +112,7 @@
   <button id="add-salary">Add Salary</button>
   <button id="start-button">Start</button>
   <button id="stop-button">Stop</button>
+  <button id="pause-button">Pause</button>
 
   <table>
     <thead>
@@ -130,6 +139,7 @@
   let salaries = [];
   let intervalId = null;
   let startTime = null;
+  let pauseTime = 0;
 
   const hourlyCheckbox = document.getElementById('hourly-mode-checkbox');
   const weeklyHoursContainer = document.getElementById('weekly-hours-container');
@@ -170,6 +180,9 @@
       <td>
         €<span id="counter-${id}">0.0000</span>
       </td>
+      <td>
+        <button onclick="removeSalary(${id})" style="background: #ff4d4d; color: #fff; border: none; padding: 0.5rem; border-radius: 4px; cursor: pointer;">Remove</button>
+      </td>
     `;
     salaryTableBody.appendChild(row);
 
@@ -180,6 +193,17 @@
       perSecond: 0,
       earnedSoFar: 0,
     });
+  }
+
+  function removeSalary(id) {
+    // Find the row and remove it from the table
+    const rowToRemove = document.querySelector(`#salary-${id}`).closest('tr');
+    if (rowToRemove) {
+      rowToRemove.remove();
+    }
+
+    // Remove the corresponding salary entry from the array
+    salaries = salaries.filter(salary => salary.id !== id);
   }
 
   // Format elapsed time as HH:MM:SS
@@ -202,7 +226,6 @@
     }
   }
 
-  // Start the live counter
   function startCounter() {
     if (intervalId !== null) return; // Prevent multiple intervals
 
@@ -220,10 +243,11 @@
         // Default mode
         salary.perSecond = salary.yearlySalary / (365 * 24 * 60 * 60);
       }
-      salary.earnedSoFar = 0; // Reset earned amount
+      salary.earnedSoFar = salary.earnedSoFar || 0; // Keep previous earned amount
     });
 
-    startTime = Date.now();
+    // Adjust start time based on pause duration
+    startTime = Date.now() - pauseTime;
 
     intervalId = setInterval(() => {
       const elapsedMs = Date.now() - startTime;
@@ -246,16 +270,24 @@
     }, 50);
   }
 
-  // Stop the live counter
+  function pauseCounter() {
+    if (intervalId !== null) {
+      clearInterval(intervalId);
+      intervalId = null;
+      pauseTime = Date.now() - startTime; // Record the elapsed time before pausing
+    }
+  }
   function stopCounter() {
     if (intervalId !== null) {
       clearInterval(intervalId);
       intervalId = null;
     }
+    pauseTime = 0; // Reset pause time on stop
   }
 
   document.getElementById('add-salary').addEventListener('click', addSalary);
   document.getElementById('start-button').addEventListener('click', startCounter);
+  document.getElementById('pause-button').addEventListener('click', pauseCounter);
   document.getElementById('stop-button').addEventListener('click', stopCounter);
 
   // Add an initial salary row by default

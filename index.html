@@ -5,206 +5,701 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Live Salary Counter</title>
   <style>
+    :root {
+      --bg-0: #0a0a1a;
+      --bg-1: #141433;
+      --accent: #6ee7ff;
+      --accent-2: #a78bfa;
+      --money: #34d399;
+      --money-glow: rgba(52, 211, 153, 0.55);
+      --danger: #fb7185;
+      --text: #e7e9f5;
+      --text-dim: #9aa0c0;
+      --glass: rgba(255, 255, 255, 0.06);
+      --glass-strong: rgba(255, 255, 255, 0.1);
+      --stroke: rgba(255, 255, 255, 0.12);
+      --radius: 18px;
+      --font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
     body {
-      font-family: Arial, sans-serif;
-      margin: 2rem;
-      background: #f7f7f7;
+      font-family: var(--font);
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 800px at 15% -10%, rgba(110, 231, 255, 0.18), transparent 55%),
+        radial-gradient(1000px 700px at 110% 10%, rgba(167, 139, 250, 0.20), transparent 50%),
+        radial-gradient(900px 900px at 50% 120%, rgba(52, 211, 153, 0.12), transparent 55%),
+        linear-gradient(160deg, var(--bg-0), var(--bg-1));
+      background-attachment: fixed;
+      padding: 2.5rem 1rem 4rem;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* slow drifting aurora layer */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -30%;
+      z-index: -1;
+      background:
+        radial-gradient(500px 500px at 30% 40%, rgba(110, 231, 255, 0.10), transparent 60%),
+        radial-gradient(600px 600px at 70% 60%, rgba(167, 139, 250, 0.10), transparent 60%);
+      animation: drift 22s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+
+    @keyframes drift {
+      from { transform: translate3d(-4%, -2%, 0) scale(1); }
+      to   { transform: translate3d(4%, 3%, 0) scale(1.1); }
     }
 
     h1 {
       text-align: center;
-      margin-bottom: 1.5rem;
+      margin: 0 0 0.4rem;
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(120deg, var(--accent), var(--accent-2) 60%, #fff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
     }
 
-    .container {
-      background: #fff;
-      padding: 2rem;
-      border-radius: 8px;
-      max-width: 600px;
+    .subtitle {
+      text-align: center;
+      color: var(--text-dim);
+      max-width: 640px;
+      margin: 0 auto 2rem;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .shell {
+      max-width: 720px;
       margin: auto;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
     }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 1rem;
+    .card {
+      background: var(--glass);
+      backdrop-filter: blur(18px) saturate(140%);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow:
+        0 8px 40px rgba(0, 0, 0, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
 
-    th, td {
-      padding: 0.5rem;
-      text-align: left;
-      border: 1px solid #ddd;
+    .card h2 {
+      margin: 0 0 0.35rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
     }
 
-    th {
-      background: #f0f0f0;
+    .card .hint {
+      margin: 0 0 1rem;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      line-height: 1.45;
     }
 
-    .checkbox-container {
-      margin-bottom: 1rem;
-      text-align: left;
+    /* --- Hero: the big live cost --- */
+    .hero {
+      text-align: center;
+      padding: 2rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero .label {
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      margin-bottom: 0.5rem;
+    }
+
+    .hero .amount {
+      font-size: clamp(2.8rem, 11vw, 4.6rem);
+      font-weight: 800;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      color: var(--money);
+      text-shadow: 0 0 28px var(--money-glow);
+      letter-spacing: -0.03em;
+    }
+
+    .hero .amount .cur { color: var(--text-dim); font-weight: 600; }
+
+    .hero.pulse .amount { animation: pop 0.45s ease; }
+    @keyframes pop {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.06); text-shadow: 0 0 46px var(--money-glow); }
+      100% { transform: scale(1); }
+    }
+
+    .hero .stopwatch {
+      margin-top: 0.75rem;
+      font-size: 0.95rem;
+      color: var(--text-dim);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hero .stopwatch .dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--danger);
+      margin-right: 6px;
+      vertical-align: middle;
+      box-shadow: 0 0 10px var(--danger);
+    }
+    .hero.running .stopwatch .dot { animation: blink 1.1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0.2; } }
+
+    /* --- Controls / buttons --- */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      justify-content: center;
     }
 
     button {
-      margin-right: 0.5rem;
-      padding: 0.5rem 1rem;
-      font-size: 1rem;
+      font-family: inherit;
+      font-size: 0.92rem;
+      font-weight: 600;
       cursor: pointer;
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      padding: 0.6rem 1.15rem;
+      color: var(--text);
+      background: var(--glass-strong);
+      transition: transform 0.12s ease, background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    button:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.28); }
+    button:active { transform: translateY(0); }
+
+    button.primary {
+      background: linear-gradient(120deg, var(--accent), var(--accent-2));
       border: none;
-      border-radius: 4px;
-      background: #007bff;
-      color: #fff;
-      transition: background 0.2s;
+      color: #0a0a1a;
+      box-shadow: 0 6px 22px rgba(110, 231, 255, 0.35);
+    }
+    button.primary:hover { box-shadow: 0 10px 30px rgba(110, 231, 255, 0.5); }
+
+    button.ghost-danger { color: var(--danger); }
+    button.ghost-danger:hover { background: rgba(251, 113, 133, 0.12); border-color: var(--danger); }
+
+    .icon-btn {
+      padding: 0.45rem 0.7rem;
+      font-size: 0.82rem;
     }
 
-    button:hover {
-      background: #0056b3;
+    /* --- Inputs --- */
+    input[type="text"],
+    input[type="number"],
+    select {
+      font-family: inherit;
+      font-size: 0.92rem;
+      color: var(--text);
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--stroke);
+      border-radius: 10px;
+      padding: 0.5rem 0.65rem;
+      width: 100%;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
-
-    .stopwatch-display {
-      font-size: 1.2rem;
-      font-weight: bold;
-      color: #555;
-      margin-top: 1rem;
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(110, 231, 255, 0.18);
     }
+    select option { background: var(--bg-1); }
 
-    .total-cost {
-      font-size: 1.5rem;
-      font-weight: bold;
+    .field-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .field-row label { color: var(--text-dim); font-size: 0.88rem; }
+    .field-row input[type="number"] { width: 5rem; }
+
+    /* switch */
+    .switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      cursor: pointer;
+      user-select: none;
+      color: var(--text-dim);
+      font-size: 0.88rem;
+    }
+    .switch input { display: none; }
+    .switch .track {
+      width: 42px; height: 24px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid var(--stroke);
+      position: relative;
+      transition: background 0.2s ease;
+    }
+    .switch .track::after {
+      content: "";
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s ease;
+    }
+    .switch input:checked + .track {
+      background: linear-gradient(120deg, var(--accent), var(--accent-2));
+    }
+    .switch input:checked + .track::after { transform: translateX(18px); }
+
+    /* --- Tables --- */
+    table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 0.75rem; }
+    th, td { padding: 0.55rem 0.6rem; text-align: left; font-size: 0.9rem; }
+    th {
+      color: var(--text-dim);
+      font-weight: 600;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border-bottom: 1px solid var(--stroke);
+    }
+    tbody tr { transition: background 0.15s ease; }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+    td { border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .counter-cell { font-variant-numeric: tabular-nums; color: var(--money); font-weight: 600; }
+
+    .row-remove {
+      padding: 0.3rem 0.6rem;
+      font-size: 0.78rem;
+      color: var(--danger);
+      background: rgba(251,113,133,0.1);
+      border: 1px solid rgba(251,113,133,0.25);
+      border-radius: 8px;
+    }
+    .row-remove:hover { background: rgba(251,113,133,0.2); transform: none; }
+
+    /* --- Payback list with progress bars --- */
+    .payback-list { list-style: none; padding: 0; margin: 1rem 0 0; display: flex; flex-direction: column; gap: 0.65rem; }
+    .payback-item {
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      padding: 0.7rem 0.85rem;
+      background: rgba(0,0,0,0.18);
+      transition: border-color 0.3s ease, background 0.3s ease;
+    }
+    .payback-item.reached {
+      border-color: rgba(52, 211, 153, 0.5);
+      background: rgba(52, 211, 153, 0.08);
+    }
+    .payback-item .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.5rem;
+      margin-bottom: 0.45rem;
+      font-size: 0.9rem;
+    }
+    .payback-item .name { font-weight: 600; }
+    .payback-item.reached .name::before { content: "✅ "; }
+    .payback-item .price { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+    .payback-item.reached .price { color: var(--money); }
+    .bar {
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    .bar > span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), var(--money));
+      transition: width 0.2s linear;
+    }
+    .payback-empty { color: var(--text-dim); font-size: 0.85rem; margin-top: 0.75rem; }
+
+    .banner {
       text-align: center;
-      color: #ff5722;
-      margin-top: 2rem;
+      font-weight: 700;
+      color: var(--money);
+      margin-top: 1rem;
+      min-height: 1.4rem;
+      font-size: 1rem;
     }
 
-    .threshold-message {
-      font-size: 1.2rem;
-      font-weight: bold;
-      text-align: center;
-      color: #4caf50;
-      margin-top: 1rem;
+    /* --- Receipt modal --- */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(5, 5, 18, 0.7);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      z-index: 50;
     }
+    .modal-backdrop.open { display: flex; }
+    .receipt {
+      background: linear-gradient(180deg, #15152e, #101024);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      max-width: 380px;
+      width: 100%;
+      padding: 1.75rem;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      animation: rise 0.3s ease;
+    }
+    @keyframes rise { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .receipt h3 {
+      margin: 0 0 0.25rem;
+      text-align: center;
+      font-size: 1.2rem;
+      background: linear-gradient(120deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .receipt .meta { text-align: center; color: var(--text-dim); font-size: 0.8rem; margin-bottom: 1.1rem; }
+    .receipt .big {
+      text-align: center;
+      font-size: 2.4rem;
+      font-weight: 800;
+      color: var(--money);
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 24px var(--money-glow);
+      margin-bottom: 1rem;
+    }
+    .receipt .line {
+      display: flex; justify-content: space-between;
+      font-size: 0.85rem;
+      padding: 0.3rem 0;
+      border-bottom: 1px dashed rgba(255,255,255,0.1);
+    }
+    .receipt .line span:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
+    .receipt .paid { color: var(--money); }
+    .receipt .actions { display: flex; gap: 0.5rem; margin-top: 1.25rem; }
+    .receipt .actions button { flex: 1; }
+
+    .footnote { text-align: center; color: var(--text-dim); font-size: 0.75rem; margin-top: 0.5rem; }
   </style>
 </head>
 <body>
 
-<div class="container">
-  <h1>Live Salary Counter</h1>
-  <p>
-    This tool calculates the live salary being paid to participants, and can be used to
-    calculate the cost of a meeting. 
-    You can add participants, input their annual salaries, and optionally enable "hourly mode" for more accurate calculations. 
-    In hourly mode, the tool assumes participants work a standard number of hours per week (default: 40) and adjusts the cost calculation accordingly. 
-    Watch the live counter update in real time and see how much your meeting costs as time goes by!
-  
-  </p>
+  <header>
+    <h1>Live Salary Counter</h1>
+    <p class="subtitle">
+      Watch the real cost of a meeting tick up in real time. Add what you spent today
+      and the counter <em>pays it back</em> cheapest-first — with a cha-ching each time
+      one is covered.
+    </p>
+  </header>
 
-  <div class="checkbox-container">
-    <input type="checkbox" id="hourly-mode-checkbox" />
-    <label for="hourly-mode-checkbox">Use working hours (hourly counter)</label>
+  <div class="shell">
+
+    <!-- HERO -->
+    <section class="card hero" id="hero">
+      <div class="label">Total meeting cost</div>
+      <div class="amount"><span class="cur">€</span><span id="total-cost">0.00</span></div>
+      <div class="stopwatch"><span class="dot"></span>Time elapsed <span id="stopwatch">00:00:00</span></div>
+      <div class="banner" id="threshold-message"></div>
+      <div class="controls" style="margin-top:1.25rem;">
+        <button id="start-button" class="primary">▶ Start</button>
+        <button id="pause-button">⏸ Pause</button>
+        <button id="stop-button" class="ghost-danger">⏹ Stop</button>
+      </div>
+    </section>
+
+    <!-- PARTICIPANTS -->
+    <section class="card">
+      <h2>Participants</h2>
+      <p class="hint">Enter each person's yearly salary. Toggle hourly mode to base the cost on working hours instead of around-the-clock seconds.</p>
+
+      <label class="switch">
+        <input type="checkbox" id="hourly-mode-checkbox" />
+        <span class="track"></span>
+        Use working hours (hourly counter)
+      </label>
+
+      <div class="field-row" id="weekly-hours-container" style="display:none; margin-top:1rem;">
+        <label for="weekly-hours">Weekly hours worked:</label>
+        <input type="number" id="weekly-hours" placeholder="40" min="1" value="40" />
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Salary (€/yr)</th>
+            <th>Live counter (€)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="salary-table-body"></tbody>
+      </table>
+
+      <div style="margin-top:1rem;">
+        <button id="add-salary" class="icon-btn">＋ Add participant</button>
+      </div>
+    </section>
+
+    <!-- SPENDING -->
+    <section class="card">
+      <h2>Things you spent today</h2>
+      <p class="hint">
+        Add what you spent and its cost. As the meeting climbs, it pays these back
+        cheapest-first. Pick <strong>Monthly</strong> for recurring costs (e.g. a €480
+        mortgage) — those are divided by your working days for the daily share.
+        Thresholds lock in when you hit Start.
+      </p>
+
+      <div class="field-row">
+        <label for="working-days">Working days per month:</label>
+        <input type="number" id="working-days" min="1" value="22" />
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Cost (€)</th>
+            <th>Type</th>
+            <th>€/day</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="spending-table-body"></tbody>
+      </table>
+
+      <div style="margin-top:1rem;">
+        <button id="add-item" class="icon-btn">＋ Add item</button>
+      </div>
+
+      <ul class="payback-list" id="payback-list"></ul>
+      <p class="payback-empty" id="payback-empty">Add items above, then hit Start to watch them get paid back.</p>
+    </section>
+
+    <p class="footnote">Single static page · works on GitHub Pages · no data leaves your browser</p>
   </div>
 
-  <div id="weekly-hours-container" style="display: none;">
-    <label for="weekly-hours">Weekly Hours Worked:</label>
-    <input type="number" id="weekly-hours" placeholder="e.g., 40" min="1" value="40" />
+  <!-- RECEIPT MODAL -->
+  <div class="modal-backdrop" id="receipt-backdrop">
+    <div class="receipt" id="receipt">
+      <h3>🧾 Meeting Receipt</h3>
+      <div class="meta" id="receipt-meta"></div>
+      <div class="big"><span style="font-size:1.3rem;color:var(--text-dim);">€</span><span id="receipt-total">0.00</span></div>
+      <div id="receipt-lines"></div>
+      <div class="actions">
+        <button class="primary" id="receipt-copy">📋 Copy summary</button>
+        <button id="receipt-close">Close</button>
+      </div>
+    </div>
   </div>
-
-  <button id="add-salary">Add Salary</button>
-  <button id="start-button">Start</button>
-  <button id="stop-button">Stop</button>
-  <button id="pause-button">Pause</button>
-
-  <table>
-    <thead>
-      <tr>
-        <th>Salary (€)</th>
-        <th>Live Counter (€)</th>
-      </tr>
-    </thead>
-    <tbody id="salary-table-body"></tbody>
-  </table>
-
-  <div class="stopwatch-display">
-    Time elapsed: <span id="stopwatch">00:00:00</span>
-  </div>
-
-  <div class="total-cost">
-    Total Meeting Cost: €<span id="total-cost">0.0000</span>
-  </div>
-
-  <div class="threshold-message" id="threshold-message"></div>
-</div>
 
 <script>
   let salaries = [];
   let intervalId = null;
   let startTime = null;
   let pauseTime = 0;
+  let lastTotalCost = 0;
 
   const hourlyCheckbox = document.getElementById('hourly-mode-checkbox');
   const weeklyHoursContainer = document.getElementById('weekly-hours-container');
   const weeklyHoursInput = document.getElementById('weekly-hours');
   const salaryTableBody = document.getElementById('salary-table-body');
+  const spendingTableBody = document.getElementById('spending-table-body');
   const stopwatchDisplay = document.getElementById('stopwatch');
   const totalCostDisplay = document.getElementById('total-cost');
   const thresholdMessage = document.getElementById('threshold-message');
+  const paybackList = document.getElementById('payback-list');
+  const paybackEmpty = document.getElementById('payback-empty');
+  const hero = document.getElementById('hero');
 
-  const messages = [
-    { threshold: 2, message: "You can buy a Coke with the cost of this meeting!" },
-    { threshold: 5, message: "You can buy a packet of cigarettes with the cost of this meeting!" },
-    { threshold: 10, message: "You can go to McDonald's with the cost of this meeting!" },
-    { threshold: 20, message: "You can buy a good book  with the cost of this meeting!" },
-    { threshold: 50, message: "You can fill your car's gas tank  with the cost of this meeting!" },
-    { threshold: 100, message: "You can take a decent dinner for two  with the cost of this meeting!" },
-    { threshold: 200, message: "You can spend a weekend in a nice hotel  with the cost of this meeting!" },
-    { threshold: 500, message: "You can buy a low-end laptop  with the cost of this meeting!" },
-    { threshold: 1000, message: "You can buy a mac  with the cost of this meeting!" },
-  ];
+  // User-entered things spent today: { id }
+  let spendingItems = [];
+  let nextItemId = 0;
 
+  // Sorted (cheapest-first) items with running cumulative thresholds, computed on Start.
+  let thresholds = [];
   let currentMessageIndex = 0;
+
+  // --- Sound: synthesized "cha-ching" via the Web Audio API (no external files) ---
+  let audioCtx = null;
+
+  function playChaChing() {
+    try {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const now = audioCtx.currentTime;
+      [
+        { freq: 880, start: 0, dur: 0.12 },
+        { freq: 1320, start: 0.1, dur: 0.18 },
+      ].forEach(({ freq, start, dur }) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, now + start);
+        gain.gain.exponentialRampToValueAtTime(0.3, now + start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + start + dur);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(now + start);
+        osc.stop(now + start + dur);
+      });
+    } catch (e) {
+      // Audio not available (e.g. blocked autoplay) — fail silently.
+    }
+  }
+
+  const workingDaysInput = document.getElementById('working-days');
+
+  function getWorkingDays() {
+    const d = parseFloat(workingDaysInput.value);
+    return Number.isFinite(d) && d > 0 ? d : 22;
+  }
+
+  function dailyCost(rawCost, type) {
+    return type === 'monthly' ? rawCost / getWorkingDays() : rawCost;
+  }
+
+  // --- Spending items table ---
+  function addSpendingItem(name = '', cost = '', type = 'oneoff') {
+    const id = nextItemId++;
+    const row = document.createElement('tr');
+    row.dataset.itemId = id;
+    row.innerHTML = `
+      <td><input type="text" id="item-name-${id}" placeholder="e.g. Chips" value="${name}" /></td>
+      <td><input type="number" id="item-cost-${id}" placeholder="1" min="0" step="0.01" value="${cost}" style="width:5.5rem;" /></td>
+      <td>
+        <select id="item-type-${id}">
+          <option value="oneoff"${type === 'oneoff' ? ' selected' : ''}>One-off</option>
+          <option value="monthly"${type === 'monthly' ? ' selected' : ''}>Monthly</option>
+        </select>
+      </td>
+      <td class="counter-cell">€<span id="item-daily-${id}">0.00</span></td>
+      <td><button class="row-remove" onclick="removeSpendingItem(${id})">Remove</button></td>
+    `;
+    spendingTableBody.appendChild(row);
+    spendingItems.push({ id });
+
+    const refresh = () => updateDailyPreview(id);
+    row.querySelector(`#item-cost-${id}`).addEventListener('input', refresh);
+    row.querySelector(`#item-type-${id}`).addEventListener('change', refresh);
+    refresh();
+  }
+
+  function updateDailyPreview(id) {
+    const rawCost = parseFloat(document.getElementById(`item-cost-${id}`).value);
+    const type = document.getElementById(`item-type-${id}`).value;
+    const span = document.getElementById(`item-daily-${id}`);
+    span.textContent = Number.isFinite(rawCost) ? dailyCost(rawCost, type).toFixed(2) : '0.00';
+  }
+
+  function removeSpendingItem(id) {
+    const row = spendingTableBody.querySelector(`tr[data-item-id="${id}"]`);
+    if (row) row.remove();
+    spendingItems = spendingItems.filter(item => item.id !== id);
+  }
+  window.removeSpendingItem = removeSpendingItem;
+
+  // Read the inputs, convert monthly→daily, drop blanks/invalid, sort cheapest-first,
+  // then build running cumulative thresholds.
+  function buildThresholds() {
+    const items = spendingItems
+      .map(item => {
+        const rawCost = parseFloat(document.getElementById(`item-cost-${item.id}`).value);
+        const type = document.getElementById(`item-type-${item.id}`).value;
+        const name = document.getElementById(`item-name-${item.id}`).value.trim();
+        return { name: name || 'Item', type, cost: dailyCost(rawCost, type) };
+      })
+      .filter(item => Number.isFinite(item.cost) && item.cost > 0)
+      .sort((a, b) => a.cost - b.cost);
+
+    let cumulative = 0;
+    thresholds = items.map(item => {
+      const prev = cumulative;
+      cumulative += item.cost;
+      return { name: item.name, type: item.type, cost: item.cost, from: prev, threshold: cumulative };
+    });
+    currentMessageIndex = 0;
+    thresholdMessage.textContent = '';
+    renderPaybackList(0);
+  }
+
+  // Render the payback list with live progress bars.
+  function renderPaybackList(totalCost) {
+    if (thresholds.length === 0) {
+      paybackList.innerHTML = '';
+      paybackEmpty.style.display = 'block';
+      return;
+    }
+    paybackEmpty.style.display = 'none';
+    paybackList.innerHTML = thresholds
+      .map((item, i) => {
+        const reached = i < currentMessageIndex;
+        // progress of THIS item: how far totalCost has filled its own slice (from → threshold)
+        let pct;
+        if (reached) pct = 100;
+        else {
+          const span = item.threshold - item.from;
+          pct = span > 0 ? Math.max(0, Math.min(100, ((totalCost - item.from) / span) * 100)) : 0;
+        }
+        const note = item.type === 'monthly' ? '/day' : '';
+        return `
+          <li class="payback-item ${reached ? 'reached' : ''}">
+            <div class="top">
+              <span class="name">${escapeHtml(item.name)}</span>
+              <span class="price">€${item.cost.toFixed(2)}${note} · at €${item.threshold.toFixed(2)}</span>
+            </div>
+            <div class="bar"><span style="width:${pct.toFixed(1)}%"></span></div>
+          </li>`;
+      })
+      .join('');
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
 
   // Toggle weekly hours input visibility based on hourly mode
   hourlyCheckbox.addEventListener('change', () => {
-    weeklyHoursContainer.style.display = hourlyCheckbox.checked ? 'block' : 'none';
+    weeklyHoursContainer.style.display = hourlyCheckbox.checked ? 'flex' : 'none';
   });
 
   // Add a new salary row to the table
   function addSalary() {
     const id = salaries.length;
-
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td>
-        <input type="number" id="salary-${id}" placeholder="Enter yearly salary" min="0" value="50000" />
-      </td>
-      <td>
-        €<span id="counter-${id}">0.0000</span>
-      </td>
-      <td>
-        <button onclick="removeSalary(${id})" style="background: #ff4d4d; color: #fff; border: none; padding: 0.5rem; border-radius: 4px; cursor: pointer;">Remove</button>
-      </td>
+      <td><input type="number" id="salary-${id}" placeholder="Yearly salary" min="0" value="50000" /></td>
+      <td class="counter-cell">€<span id="counter-${id}">0.00</span></td>
+      <td><button class="row-remove" onclick="removeSalary(${id})">Remove</button></td>
     `;
     salaryTableBody.appendChild(row);
-
-    // Add salary to the list
-    salaries.push({
-      id,
-      yearlySalary: 50000,
-      perSecond: 0,
-      earnedSoFar: 0,
-    });
+    salaries.push({ id, yearlySalary: 50000, perSecond: 0, earnedSoFar: 0 });
   }
 
   function removeSalary(id) {
-    // Find the row and remove it from the table
     const rowToRemove = document.querySelector(`#salary-${id}`).closest('tr');
-    if (rowToRemove) {
-      rowToRemove.remove();
-    }
-
-    // Remove the corresponding salary entry from the array
+    if (rowToRemove) rowToRemove.remove();
     salaries = salaries.filter(salary => salary.id !== id);
   }
+  window.removeSalary = removeSalary;
 
   // Format elapsed time as HH:MM:SS
   function formatElapsedTime(elapsedMs) {
@@ -215,19 +710,40 @@
     return `${hours}:${minutes}:${seconds}`;
   }
 
-  // Update the threshold message
+  // Advance through every threshold the total cost has now passed.
   function updateThresholdMessage(totalCost) {
-    if (
-      currentMessageIndex < messages.length &&
-      totalCost >= messages[currentMessageIndex].threshold
+    let crossed = false;
+    while (
+      currentMessageIndex < thresholds.length &&
+      totalCost >= thresholds[currentMessageIndex].threshold
     ) {
-      thresholdMessage.textContent = messages[currentMessageIndex].message;
       currentMessageIndex++;
+      crossed = true;
+    }
+
+    if (crossed) {
+      playChaChing();
+      // pulse the hero amount
+      hero.classList.remove('pulse');
+      void hero.offsetWidth; // reflow to restart animation
+      hero.classList.add('pulse');
+
+      const justPaid = thresholds[currentMessageIndex - 1];
+      thresholdMessage.textContent = `💸 Paid back: ${justPaid.name}`;
     }
   }
 
   function startCounter() {
     if (intervalId !== null) return; // Prevent multiple intervals
+
+    // Resume the audio context on this user gesture so the beep can play later.
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+    // Snapshot the spending items into sorted cumulative thresholds.
+    buildThresholds();
 
     const weeklyHours = parseFloat(weeklyHoursInput.value) || 40;
 
@@ -236,37 +752,34 @@
       salary.yearlySalary = parseFloat(salaryInput.value) || 0;
 
       if (hourlyCheckbox.checked) {
-        // Hourly mode: calculate per second based on weekly hours
         const secondsWorkedPerYear = weeklyHours * 52 * 3600;
         salary.perSecond = salary.yearlySalary / secondsWorkedPerYear;
       } else {
-        // Default mode
         salary.perSecond = salary.yearlySalary / (365 * 24 * 60 * 60);
       }
-      salary.earnedSoFar = salary.earnedSoFar || 0; // Keep previous earned amount
+      salary.earnedSoFar = salary.earnedSoFar || 0;
     });
 
-    // Adjust start time based on pause duration
     startTime = Date.now() - pauseTime;
+    hero.classList.add('running');
 
     intervalId = setInterval(() => {
       const elapsedMs = Date.now() - startTime;
       stopwatchDisplay.textContent = formatElapsedTime(elapsedMs);
 
       let totalCost = 0;
-
       salaries.forEach((salary) => {
         const elapsedSeconds = elapsedMs / 1000;
         salary.earnedSoFar = elapsedSeconds * salary.perSecond;
-
         const counter = document.getElementById(`counter-${salary.id}`);
-        counter.textContent = salary.earnedSoFar.toFixed(4);
-
+        if (counter) counter.textContent = salary.earnedSoFar.toFixed(2);
         totalCost += salary.earnedSoFar;
       });
 
-      totalCostDisplay.textContent = totalCost.toFixed(4);
+      lastTotalCost = totalCost;
+      totalCostDisplay.textContent = totalCost.toFixed(2);
       updateThresholdMessage(totalCost);
+      renderPaybackList(totalCost);
     }, 50);
   }
 
@@ -274,24 +787,97 @@
     if (intervalId !== null) {
       clearInterval(intervalId);
       intervalId = null;
-      pauseTime = Date.now() - startTime; // Record the elapsed time before pausing
+      pauseTime = Date.now() - startTime;
+      hero.classList.remove('running');
     }
   }
+
   function stopCounter() {
     if (intervalId !== null) {
       clearInterval(intervalId);
       intervalId = null;
     }
-    pauseTime = 0; // Reset pause time on stop
+    hero.classList.remove('running');
+    // Only show a receipt if the meeting actually ran.
+    if (lastTotalCost > 0) showReceipt(lastTotalCost);
+    pauseTime = 0;
   }
 
+  // --- Receipt / shareable summary ---
+  const receiptBackdrop = document.getElementById('receipt-backdrop');
+  const receiptMeta = document.getElementById('receipt-meta');
+  const receiptTotal = document.getElementById('receipt-total');
+  const receiptLines = document.getElementById('receipt-lines');
+  let lastReceiptText = '';
+
+  function showReceipt(totalCost) {
+    const elapsed = stopwatchDisplay.textContent;
+    const people = salaries.length;
+    receiptMeta.textContent = `${people} ${people === 1 ? 'person' : 'people'} · ${elapsed} elapsed`;
+    receiptTotal.textContent = totalCost.toFixed(2);
+
+    const paid = thresholds.slice(0, currentMessageIndex);
+    const pending = thresholds.slice(currentMessageIndex);
+
+    let html = '';
+    if (paid.length) {
+      html += paid.map(it =>
+        `<div class="line"><span class="paid">✅ ${escapeHtml(it.name)}</span><span class="paid">€${it.cost.toFixed(2)}</span></div>`
+      ).join('');
+    }
+    if (pending.length) {
+      const next = pending[0];
+      const remaining = (next.threshold - totalCost);
+      html += `<div class="line"><span>⬜ Next: ${escapeHtml(next.name)}</span><span>€${remaining.toFixed(2)} to go</span></div>`;
+    }
+    if (!paid.length && !pending.length) {
+      html += `<div class="line"><span>No spending items added</span><span></span></div>`;
+    }
+    receiptLines.innerHTML = html;
+
+    // Plain-text version for the clipboard.
+    const paidText = paid.length ? paid.map(it => `✅ ${it.name} (€${it.cost.toFixed(2)})`).join('\n') : '(none paid back yet)';
+    lastReceiptText =
+`🧾 Meeting Receipt
+Cost: €${totalCost.toFixed(2)} over ${elapsed} (${people} ${people === 1 ? 'person' : 'people'})
+
+Paid back:
+${paidText}` + (pending.length ? `\n\nNext up: ${pending[0].name} (€${(pending[0].threshold - totalCost).toFixed(2)} to go)` : '');
+
+    receiptBackdrop.classList.add('open');
+  }
+
+  document.getElementById('receipt-close').addEventListener('click', () => {
+    receiptBackdrop.classList.remove('open');
+  });
+  receiptBackdrop.addEventListener('click', (e) => {
+    if (e.target === receiptBackdrop) receiptBackdrop.classList.remove('open');
+  });
+  document.getElementById('receipt-copy').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    try {
+      await navigator.clipboard.writeText(lastReceiptText);
+      const original = btn.textContent;
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    } catch (err) {
+      // Clipboard blocked (e.g. file://) — fall back to a selectable prompt.
+      window.prompt('Copy your meeting receipt:', lastReceiptText);
+    }
+  });
+
   document.getElementById('add-salary').addEventListener('click', addSalary);
+  document.getElementById('add-item').addEventListener('click', () => addSpendingItem());
   document.getElementById('start-button').addEventListener('click', startCounter);
   document.getElementById('pause-button').addEventListener('click', pauseCounter);
   document.getElementById('stop-button').addEventListener('click', stopCounter);
 
-  // Add an initial salary row by default
+  // Seed defaults
   addSalary();
+  addSpendingItem('Chips', '1');
+  addSpendingItem('Gasoline', '10');
+  addSpendingItem('Mortgage', '480', 'monthly');
+  renderPaybackList(0);
 </script>
 
 </body>

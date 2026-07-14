@@ -320,6 +320,31 @@
     .payback-item.reached .name::before { content: "✅ "; }
     .payback-item .price { color: var(--text-dim); font-variant-numeric: tabular-nums; }
     .payback-item.reached .price { color: var(--money); }
+
+    /* work-hours badge for big-ticket items */
+    .payback-item .meta-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.45rem;
+      flex-wrap: wrap;
+    }
+    .work-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      color: var(--accent-2);
+      background: rgba(167, 139, 250, 0.12);
+      border: 1px solid rgba(167, 139, 250, 0.35);
+      border-radius: 999px;
+      padding: 0.18rem 0.6rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .work-badge .clock { font-size: 0.8rem; line-height: 1; }
+    .payback-item.big { border-color: rgba(167, 139, 250, 0.35); }
     .bar {
       height: 7px;
       border-radius: 999px;
@@ -464,12 +489,16 @@
         Add what you spent and its cost. As the meeting climbs, it pays these back
         cheapest-first. Pick <strong>Monthly</strong> for recurring costs (e.g. a €480
         mortgage) — those are divided by your working days for the daily share.
-        Thresholds lock in when you hit Start.
+        Big-ticket items that take more than one work-day to earn get a
+        <span style="color:var(--accent-2)">⏱ work-hours</span> badge instead of a race
+        you'd never win. Thresholds lock in when you hit Start.
       </p>
 
       <div class="field-row">
         <label for="working-days">Working days per month:</label>
         <input type="number" id="working-days" min="1" value="22" />
+        <label for="hours-per-day" style="margin-left:0.5rem;">Hours per work-day:</label>
+        <input type="number" id="hours-per-day" min="1" step="0.5" value="6" />
       </div>
 
       <table>
@@ -567,14 +596,48 @@
   }
 
   const workingDaysInput = document.getElementById('working-days');
+  const hoursPerDayInput = document.getElementById('hours-per-day');
 
   function getWorkingDays() {
     const d = parseFloat(workingDaysInput.value);
     return Number.isFinite(d) && d > 0 ? d : 22;
   }
 
+  function getHoursPerDay() {
+    const h = parseFloat(hoursPerDayInput.value);
+    return Number.isFinite(h) && h > 0 ? h : 6;
+  }
+
   function dailyCost(rawCost, type) {
     return type === 'monthly' ? rawCost / getWorkingDays() : rawCost;
+  }
+
+  // Average per-person hourly rate across participants, read live from the salary
+  // inputs. This answers "how long would ONE person work to afford this," independent
+  // of how many people are in the meeting. Uses a working-hours-per-year basis so the
+  // result is real work-hours, not calendar hours.
+  function getPerPersonHourlyRate() {
+    const weeklyHours = parseFloat(weeklyHoursInput.value) || 40;
+    const workHoursPerYear = weeklyHours * 52;
+
+    const rates = salaries
+      .map(s => {
+        const input = document.getElementById(`salary-${s.id}`);
+        const yearly = input ? parseFloat(input.value) : NaN;
+        return Number.isFinite(yearly) && yearly > 0 ? yearly / workHoursPerYear : null;
+      })
+      .filter(r => r !== null);
+
+    if (rates.length === 0) return 0;
+    return rates.reduce((sum, r) => sum + r, 0) / rates.length;
+  }
+
+  // Work-hours for an item = its daily cost ÷ one person's hourly rate.
+  // Returns null when we can't compute a rate yet (no valid salaries).
+  function workHoursFor(dailyItemCost) {
+    const rate = getPerPersonHourlyRate();
+    if (rate <= 0) return null;
+    return dailyItemCost / rate;
   }
 
   // --- Spending items table ---
@@ -597,9 +660,10 @@
     spendingTableBody.appendChild(row);
     spendingItems.push({ id });
 
-    const refresh = () => updateDailyPreview(id);
+    const refresh = () => { updateDailyPreview(id); refreshPaybackIfIdle(); };
     row.querySelector(`#item-cost-${id}`).addEventListener('input', refresh);
     row.querySelector(`#item-type-${id}`).addEventListener('change', refresh);
+    row.querySelector(`#item-name-${id}`).addEventListener('input', refreshPaybackIfIdle);
     refresh();
   }
 
@@ -641,6 +705,15 @@
     renderPaybackList(0);
   }
 
+  // Re-render badges/bars when idle (paused or stopped) after a config/salary edit,
+  // so work-hours reflect the new rate without needing to restart. No-op while the
+  // counter is running (the loop already re-renders every tick) or before any Start.
+  function refreshPaybackIfIdle() {
+    if (intervalId === null && thresholds.length > 0) {
+      renderPaybackList(lastTotalCost);
+    }
+  }
+
   // Render the payback list with live progress bars.
   function renderPaybackList(totalCost) {
     if (thresholds.length === 0) {
@@ -649,6 +722,7 @@
       return;
     }
     paybackEmpty.style.display = 'none';
+    const hoursPerDay = getHoursPerDay();
     paybackList.innerHTML = thresholds
       .map((item, i) => {
         const reached = i < currentMessageIndex;
@@ -660,16 +734,46 @@
           pct = span > 0 ? Math.max(0, Math.min(100, ((totalCost - item.from) / span) * 100)) : 0;
         }
         const note = item.type === 'monthly' ? '/day' : '';
+
+        // Big-ticket items (> one work-day to earn) get a work-hours badge.
+        const hours = workHoursFor(item.cost);
+        const isBig = hours !== null && hours > hoursPerDay;
+        let badge = '';
+        if (isBig) {
+          const days = hours / hoursPerDay;
+          const daysLabel = days >= 1 ? ` · ≈ ${formatWorkDays(days)}` : '';
+          badge = `<span class="work-badge" title="Time one person would work to earn this">
+              <span class="clock">⏱</span>≈ ${formatWorkHours(hours)}${daysLabel}
+            </span>`;
+        }
+
         return `
-          <li class="payback-item ${reached ? 'reached' : ''}">
+          <li class="payback-item ${reached ? 'reached' : ''} ${isBig ? 'big' : ''}">
             <div class="top">
               <span class="name">${escapeHtml(item.name)}</span>
               <span class="price">€${item.cost.toFixed(2)}${note} · at €${item.threshold.toFixed(2)}</span>
             </div>
+            ${badge ? `<div class="meta-row">${badge}</div>` : ''}
             <div class="bar"><span style="width:${pct.toFixed(1)}%"></span></div>
           </li>`;
       })
       .join('');
+  }
+
+  // "3.5 work-hours", "1 work-hour", "45 min" for sub-hour values.
+  function formatWorkHours(hours) {
+    if (hours < 1) {
+      const mins = Math.round(hours * 60);
+      return `${mins} min`;
+    }
+    const rounded = Math.round(hours * 10) / 10;
+    return `${rounded} work-hour${rounded === 1 ? '' : 's'}`;
+  }
+
+  // "2 work-days", "1.5 work-days".
+  function formatWorkDays(days) {
+    const rounded = Math.round(days * 10) / 10;
+    return `${rounded} work-day${rounded === 1 ? '' : 's'}`;
   }
 
   function escapeHtml(s) {
@@ -692,6 +796,9 @@
     `;
     salaryTableBody.appendChild(row);
     salaries.push({ id, yearlySalary: 50000, perSecond: 0, earnedSoFar: 0 });
+
+    // When idle, editing a salary changes the per-person rate → refresh work-hours badges.
+    row.querySelector(`#salary-${id}`).addEventListener('input', refreshPaybackIfIdle);
   }
 
   function removeSalary(id) {
@@ -871,6 +978,11 @@ ${paidText}` + (pending.length ? `\n\nNext up: ${pending[0].name} (€${(pending
   document.getElementById('start-button').addEventListener('click', startCounter);
   document.getElementById('pause-button').addEventListener('click', pauseCounter);
   document.getElementById('stop-button').addEventListener('click', stopCounter);
+
+  // Config changes affect work-hours math → refresh badges when idle.
+  hoursPerDayInput.addEventListener('input', refreshPaybackIfIdle);
+  workingDaysInput.addEventListener('input', refreshPaybackIfIdle);
+  weeklyHoursInput.addEventListener('input', refreshPaybackIfIdle);
 
   // Seed defaults
   addSalary();
